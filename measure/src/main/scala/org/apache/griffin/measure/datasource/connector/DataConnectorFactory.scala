@@ -1,21 +1,20 @@
 /*
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-*/
 package org.apache.griffin.measure.datasource.connector
 
 import scala.util.Try
@@ -89,21 +88,30 @@ object DataConnectorFactory extends Loggable {
     }
   }
 
-  private def getCustomConnector(session: SparkSession,
-                                 context: StreamingContext,
-                                 param: DataConnectorParam,
-                                 storage: TimestampStorage,
-                                 maybeClient: Option[StreamingCacheClient]): DataConnector = {
-    val className = param.getConfig("class").asInstanceOf[String]
+  private def getCustomConnector(sparkSession: SparkSession,
+                                 ssc: StreamingContext,
+                                 dcParam: DataConnectorParam,
+                                 timestampStorage: TimestampStorage,
+                                 streamingCacheClientOpt: Option[StreamingCacheClient]): DataConnector = {
+    val className = dcParam.getConfig("class").asInstanceOf[String]
     val cls = Class.forName(className)
     if (classOf[BatchDataConnector].isAssignableFrom(cls)) {
-      val ctx = BatchDataConnectorContext(session, param, storage)
-      val meth = cls.getDeclaredMethod("apply", classOf[BatchDataConnectorContext])
-      meth.invoke(null, ctx).asInstanceOf[BatchDataConnector]
+      val method = cls.getDeclaredMethod("apply",
+        classOf[SparkSession],
+        classOf[DataConnectorParam],
+        classOf[TimestampStorage]
+      )
+      method.invoke(null, sparkSession, dcParam, timestampStorage).asInstanceOf[BatchDataConnector]
     } else if (classOf[StreamingDataConnector].isAssignableFrom(cls)) {
-      val ctx = StreamingDataConnectorContext(session, context, param, storage, maybeClient)
-      val meth = cls.getDeclaredMethod("apply", classOf[StreamingDataConnectorContext])
-      meth.invoke(null, ctx).asInstanceOf[StreamingDataConnector]
+      val method = cls.getDeclaredMethod("apply",
+        classOf[SparkSession],
+        classOf[StreamingContext],
+        classOf[DataConnectorParam],
+        classOf[TimestampStorage],
+        classOf[Option[StreamingCacheClient]]
+      )
+      method.invoke(null, sparkSession, ssc, dcParam, timestampStorage, streamingCacheClientOpt)
+        .asInstanceOf[StreamingDataConnector]
     } else {
       throw new ClassCastException(s"$className should extend BatchDataConnector or StreamingDataConnector")
     }
