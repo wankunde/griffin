@@ -17,6 +17,8 @@
 
 package org.apache.griffin.measure.step
 
+import scala.util.Try
+
 import org.apache.griffin.measure.Loggable
 import org.apache.griffin.measure.context.DQContext
 
@@ -25,19 +27,17 @@ trait DQStep extends Loggable {
   val name: String
 
   /**
-    * @return execution success
-    */
-  def execute(context: DQContext): Boolean
+   * @return execution success
+   */
+  def execute(context: DQContext): Try[Boolean]
 
-  def getNames(): Seq[String] = name :: Nil
+  def getNames: Seq[String] = name :: Nil
 
 }
 
 object DQStepStatus extends Enumeration {
-  val PENDING = Value
-  val RUNNING = Value
-  val COMPLETE = Value
-  val FAILED = Value
+  val PENDING: DQStepStatus.Value = Value
+  val RUNNING: DQStepStatus.Value = Value
+  val COMPLETE: DQStepStatus.Value = Value
+  val FAILED: DQStepStatus.Value = Value
 }
-
-

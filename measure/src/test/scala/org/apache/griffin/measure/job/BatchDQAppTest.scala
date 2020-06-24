@@ -17,6 +17,8 @@
 
 package org.apache.griffin.measure.job
 
+import org.apache.spark.sql.AnalysisException
+import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 import org.apache.griffin.measure.Application.readParamFile
@@ -43,7 +45,7 @@ class BatchDQAppTest extends DQAppTest {
       spark.conf.set("spark.app.name", "BatchDQApp Test")
       spark.conf.set("spark.sql.crossJoin.enabled", "true")
 
-      val logLevel = getGriffinLogLevel()
+      val logLevel = getGriffinLogLevel
       sc.setLogLevel(sparkParam.getLogLevel)
       griffinLogger.setLevel(logLevel)
 
@@ -69,9 +71,19 @@ class BatchDQAppTest extends DQAppTest {
     dqContext.metricWrapper.metrics should equal(expectedMetrics)
   }
 
+  def runAndCheckException[T <: AnyRef](implicit classTag: ClassTag[T]): Unit = {
+    dqApp.run match {
+      case Success(_) =>
+        fail(
+          s"job ${dqApp.dqParam.getName} should not succeed, a ${classTag.toString} exception is expected.")
+      case Failure(ex) => assertThrows[T](throw ex)
+    }
+  }
+
   "accuracy batch job" should "work" in {
     dqApp = initApp("/_accuracy-batch-griffindsl.json")
-    val expectedMetrics = Map("total_count" -> 50,
+    val expectedMetrics = Map(
+      "total_count" -> 50,
       "miss_count" -> 4,
       "matched_count" -> 46,
       "matchedFraction" -> 0.92)
@@ -81,9 +93,7 @@ class BatchDQAppTest extends DQAppTest {
 
   "completeness batch job" should "work" in {
     dqApp = initApp("/_completeness-batch-griffindsl.json")
-    val expectedMetrics = Map("total" -> 50,
-      "incomplete" -> 1,
-      "complete" -> 49)
+    val expectedMetrics = Map("total" -> 50, "incomplete" -> 1, "complete" -> 49)
 
     runAndCheckResult(expectedMetrics)
   }
@@ -91,9 +101,8 @@ class BatchDQAppTest extends DQAppTest {
   "distinctness batch job" should "work" in {
     dqApp = initApp("/_distinctness-batch-griffindsl.json")
 
-    val expectedMetrics = Map("total" -> 50,
-      "distinct" -> 49,
-      "dup" -> Seq(Map("dup" -> 1, "num" -> 1)))
+    val expectedMetrics =
+      Map("total" -> 50, "distinct" -> 49, "dup" -> Seq(Map("dup" -> 1, "num" -> 1)))
 
     runAndCheckResult(expectedMetrics)
   }
@@ -101,7 +110,8 @@ class BatchDQAppTest extends DQAppTest {
   "profiling batch job" should "work" in {
     dqApp = initApp("/_profiling-batch-griffindsl.json")
     val expectedMetrics = Map(
-      "prof" -> Seq(Map("user_id" -> 10004, "cnt" -> 1),
+      "prof" -> Seq(
+        Map("user_id" -> 10004, "cnt" -> 1),
         Map("user_id" -> 10011, "cnt" -> 1),
         Map("user_id" -> 10010, "cnt" -> 1),
         Map("user_id" -> 10002, "cnt" -> 1),
@@ -113,25 +123,23 @@ class BatchDQAppTest extends DQAppTest {
         Map("user_id" -> 10003, "cnt" -> 1),
         Map("user_id" -> 10007, "cnt" -> 1),
         Map("user_id" -> 10012, "cnt" -> 1),
-        Map("user_id" -> 10009, "cnt" -> 1)
-      ),
-      "post_group" -> Seq(Map("post_code" -> "94022", "cnt" -> 13))
-    )
+        Map("user_id" -> 10009, "cnt" -> 1)),
+      "post_group" -> Seq(Map("post_code" -> "94022", "cnt" -> 13)))
 
     runAndCheckResult(expectedMetrics)
   }
 
   "timeliness batch job" should "work" in {
     dqApp = initApp("/_timeliness-batch-griffindsl.json")
-    val expectedMetrics = Map("total" -> 10,
+    val expectedMetrics = Map(
+      "total" -> 10,
       "avg" -> 276000,
       "percentile_95" -> 660000,
-      "step" -> Seq(Map("step" -> 0, "cnt" -> 6),
+      "step" -> Seq(
+        Map("step" -> 0, "cnt" -> 6),
         Map("step" -> 5, "cnt" -> 2),
         Map("step" -> 3, "cnt" -> 1),
-        Map("step" -> 4, "cnt" -> 1)
-      )
-    )
+        Map("step" -> 4, "cnt" -> 1)))
 
     runAndCheckResult(expectedMetrics)
   }
@@ -141,5 +149,11 @@ class BatchDQAppTest extends DQAppTest {
     val expectedMetrics = Map("total" -> 50, "unique" -> 48)
 
     runAndCheckResult(expectedMetrics)
+  }
+
+  "batch job" should "fail with exception caught due to invalid rules" in {
+    dqApp = initApp("/_profiling-batch-griffindsl_malformed.json")
+
+    runAndCheckException[AnalysisException]
   }
 }

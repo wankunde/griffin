@@ -24,9 +24,14 @@ import org.apache.griffin.measure.context.TimeRange
 import org.apache.griffin.measure.datasource.TimestampStorage
 import org.apache.griffin.measure.utils.ParamUtil._
 
-case class MySqlDataConnector(@transient sparkSession: SparkSession,
-                              dcParam: DataConnectorParam,
-                              timestampStorage: TimestampStorage) extends BatchDataConnector {
+@deprecated(
+  s"This class is deprecated. Use '${classOf[JDBCBasedDataConnector].getCanonicalName}'.",
+  "0.6.0")
+case class MySqlDataConnector(
+    @transient sparkSession: SparkSession,
+    dcParam: DataConnectorParam,
+    timestampStorage: TimestampStorage)
+    extends BatchDataConnector {
 
   val Database = "database"
   val TableName = "table.name"
@@ -46,7 +51,6 @@ case class MySqlDataConnector(@transient sparkSession: SparkSession,
   val driver: String = dcParam.getConfig.getString(Driver, "com.mysql.jdbc.Driver")
 
   override def data(ms: Long): (Option[DataFrame], TimeRange) = {
-
 
     val dfOpt = try {
       val dtSql = dataSql()

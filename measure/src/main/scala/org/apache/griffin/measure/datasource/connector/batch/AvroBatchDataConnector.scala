@@ -26,12 +26,16 @@ import org.apache.griffin.measure.utils.HdfsUtil
 import org.apache.griffin.measure.utils.ParamUtil._
 
 /**
-  * batch data connector for avro file
-  */
-case class AvroBatchDataConnector(@transient sparkSession: SparkSession,
-                                  dcParam: DataConnectorParam,
-                                  timestampStorage: TimestampStorage
-                                 ) extends BatchDataConnector {
+ * batch data connector for avro file
+ */
+@deprecated(
+  s"This class is deprecated. Use '${classOf[FileBasedDataConnector].getCanonicalName}'.",
+  "0.6.0")
+case class AvroBatchDataConnector(
+    @transient sparkSession: SparkSession,
+    dcParam: DataConnectorParam,
+    timestampStorage: TimestampStorage)
+    extends BatchDataConnector {
 
   val config: Map[String, Any] = dcParam.getConfig
 
@@ -62,6 +66,5 @@ case class AvroBatchDataConnector(@transient sparkSession: SparkSession,
     val tmsts = readTmst(ms)
     (dfOpt, TimeRange(ms, tmsts))
   }
-
 
 }

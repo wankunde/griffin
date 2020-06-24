@@ -17,11 +17,13 @@
 
 package org.apache.griffin.measure.step
 
+import scala.util.{Failure, Success, Try}
+
 import org.apache.griffin.measure.context.DQContext
 
 /**
-  * sequence of dq steps
-  */
+ * sequence of dq steps
+ */
 case class SeqDQStep(dqSteps: Seq[DQStep]) extends DQStep {
 
   val name: String = ""
@@ -29,15 +31,20 @@ case class SeqDQStep(dqSteps: Seq[DQStep]) extends DQStep {
   val details: Map[String, Any] = Map()
 
   /**
-    * @return execution success
-    */
-  def execute(context: DQContext): Boolean = {
-    dqSteps.foldLeft(true) { (ret, dqStep) =>
-      ret && dqStep.execute(context)
-    }
+   * @return execution success
+   */
+  def execute(context: DQContext): Try[Boolean] = {
+    dqSteps
+      .map(_.execute(context))
+      .foldLeft(Try(true))((ret, stepResult) => {
+        (ret, stepResult) match {
+          case (Success(_), nextResult) => nextResult
+          case (Failure(_), _) => ret
+        }
+      })
   }
 
-  override def getNames(): Seq[String] = {
+  override def getNames: Seq[String] = {
     dqSteps.foldLeft(Nil: Seq[String]) { (ret, dqStep) =>
       ret ++ dqStep.getNames
     }

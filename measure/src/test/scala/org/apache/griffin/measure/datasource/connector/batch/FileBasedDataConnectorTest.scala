@@ -17,7 +17,6 @@
 
 package org.apache.griffin.measure.datasource.connector.batch
 
-import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, StructType}
 import org.scalatest._
 
@@ -28,47 +27,15 @@ import org.apache.griffin.measure.step.builder.ConstantColumns
 
 class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-
-    createDataSets(s"file://${getClass.getResource("/").getPath}")
-  }
-
-  private def createDataSets(basePath: String): Unit = {
-    val formats = Seq("parquet", "orc", "csv", "tsv")
-    val schema = new StructType().add("name", StringType).add("age", IntegerType, nullable = true)
-
-    val df = spark.read.schema(schema).csv(s"${basePath}hive/person_table.csv")
-
-    df.cache()
-    formats.foreach(f => {
-      val delimiter = if (f.matches("csv")) "," else if (f.matches("tsv")) "\t" else ""
-      df.write
-        .mode(SaveMode.Overwrite)
-        .option("delimiter", delimiter)
-        .option("header", "true")
-        .format(if (f.matches("tsv")) "csv" else f)
-        .save(s"${basePath}files/person_table.$f")
-    })
-
-    df.unpersist()
-  }
-
-  private final val dcParam = DataConnectorParam("file", "1", "test_df", Map.empty[String, String], Nil)
+  private final val dcParam =
+    DataConnectorParam("file", "test_df", Map.empty[String, String], Nil)
   private final val timestampStorage = TimestampStorage()
-
-  // Regarding Local FileSystem
 
   "file based data connector" should "be able to read from local filesystem" in {
     val configs = Map(
       "format" -> "csv",
-      "paths" -> Seq(
-        s"file://${getClass.getResource("/hive/person_table.csv").getPath}"
-      ),
-      "options" -> Map(
-        "header" -> "false"
-      )
-    )
+      "paths" -> Seq(s"file://${getClass.getResource("/hive/person_table.csv").getPath}"),
+      "options" -> Map("header" -> "false"))
 
     val dc = FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage)
     val result = dc.data(1000L)
@@ -82,27 +49,30 @@ class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
   it should "respect the provided schema, if any" in {
     val configs = Map(
       "format" -> "csv",
-      "paths" -> Seq(
-        s"file://${getClass.getResource("/hive/person_table.csv").getPath}"
-      )
-    )
+      "paths" -> Seq(s"file://${getClass.getResource("/hive/person_table.csv").getPath}"))
 
     // no schema
     assertThrows[IllegalArgumentException](
-      FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage)
-    )
+      FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage))
 
     // invalid schema
     assertThrows[IllegalStateException](
-      FileBasedDataConnector(spark, dcParam.copy(config = configs + (("schema", ""))), timestampStorage)
-    )
+      FileBasedDataConnector(
+        spark,
+        dcParam.copy(config = configs + (("schema", ""))),
+        timestampStorage))
 
     // valid schema
-    val result1 = FileBasedDataConnector(spark,
-      dcParam.copy(config = configs + (("schema",
-        Seq(Map("name" -> "name", "type" -> "string"), Map("name" -> "age", "type" -> "int", "nullable" -> "true"))
-      )))
-      , timestampStorage)
+    val result1 = FileBasedDataConnector(
+      spark,
+      dcParam.copy(
+        config = configs + (
+          (
+            "schema",
+            Seq(
+              Map("name" -> "name", "type" -> "string"),
+              Map("name" -> "age", "type" -> "int", "nullable" -> "true"))))),
+      timestampStorage)
       .data(1L)
 
     val expSchema = new StructType()
@@ -115,17 +85,18 @@ class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
     assert(result1._1.get.schema == expSchema)
 
     // valid headers
-    val result2 = FileBasedDataConnector(spark,
-      dcParam.copy(config = configs + (("options", Map(
-        "header" -> "true"
-      )
-      )))
-      , timestampStorage)
+    val result2 = FileBasedDataConnector(
+      spark,
+      dcParam.copy(config = configs + (("options", Map("header" -> "true")))),
+      timestampStorage)
       .data(1L)
 
     assert(result2._1.isDefined)
     assert(result2._1.get.collect().length == 1)
-    result2._1.get.columns should contain theSameElementsAs Seq("Joey", "14", ConstantColumns.tmst)
+    result2._1.get.columns should contain theSameElementsAs Seq(
+      "Joey",
+      "14",
+      ConstantColumns.tmst)
   }
 
   // skip on erroneous paths
@@ -135,29 +106,28 @@ class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
       "format" -> "csv",
       "paths" -> Seq(
         s"file://${getClass.getResource("/hive/person_table.csv").getPath}",
-        s"${java.util.UUID.randomUUID().toString}/"
-      ),
+        s"${java.util.UUID.randomUUID().toString}/"),
       "skipErrorPaths" -> true,
-      "options" -> Map(
-        "header" -> "true"
-      )
-    )
+      "options" -> Map("header" -> "true"))
 
     // valid paths
-    val result1 = FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
+    val result1 =
+      FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
 
     assert(result1._1.isDefined)
     assert(result1._1.get.collect().length == 1)
 
     // non existent path
     assertThrows[IllegalArgumentException](
-      FileBasedDataConnector(spark, dcParam.copy(config = configs - "skipErrorPaths"), timestampStorage).data(1L)
-    )
+      FileBasedDataConnector(
+        spark,
+        dcParam.copy(config = configs - "skipErrorPaths"),
+        timestampStorage).data(1L))
 
     // no path
     assertThrows[AssertionError](
-      FileBasedDataConnector(spark, dcParam.copy(config = configs - "paths"), timestampStorage).data(1L)
-    )
+      FileBasedDataConnector(spark, dcParam.copy(config = configs - "paths"), timestampStorage)
+        .data(1L))
   }
 
   // Regarding various formats
@@ -167,16 +137,11 @@ class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
     formats.map(f => {
       val configs = Map(
         "format" -> f,
-        "paths" -> Seq(
-          s"file://${getClass.getResource(s"/files/person_table.$f").getPath}"
-        ),
-        "options" -> Map(
-          "header" -> "true",
-          "inferSchema" -> "true"
-        )
-      )
+        "paths" -> Seq(s"file://${getClass.getResource(s"/files/person_table.$f").getPath}"),
+        "options" -> Map("header" -> "true", "inferSchema" -> "true"))
 
-      val result = FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
+      val result =
+        FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
 
       assert(result._1.isDefined)
 
@@ -197,15 +162,12 @@ class FileBasedDataConnectorTest extends SparkSuiteBase with Matchers {
       val configs = Map(
         "format" -> f,
         "paths" -> Seq(
-          s"file://${getClass.getResource(s"/files/person_table.$f").getPath}"
-        ),
-        "options" -> Map(
-          "header" -> "true"
-        ),
-        "schema" -> Seq(Map("name" -> "name", "type" -> "string"))
-      )
+          s"file://${ClassLoader.getSystemResource(s"files/person_table.$f").getPath}"),
+        "options" -> Map("header" -> "true"),
+        "schema" -> Seq(Map("name" -> "name", "type" -> "string")))
 
-      val result = FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
+      val result =
+        FileBasedDataConnector(spark, dcParam.copy(config = configs), timestampStorage).data(1L)
 
       assert(result._1.isDefined)
 
