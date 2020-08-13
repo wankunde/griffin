@@ -26,7 +26,8 @@ This is helpful for user to debug and run user dq jobs.
 
 * Compile Griffin using maven.
 * Decompress Griffin tool file `measure-x.x.x-package.tar.gz` in the target directory of measure module.
-* Go to the decompress directory, and run Griffin tool with user defined env file and dq file. eg: `./bin/griffin-shell.sh ENV_FILE DQ_FILE`
+* Set `HADOOP_CONF_DIR`, `HIVE_CONF_DIR`, `SPARK_CONF_DIR` environment variables in `measure-x.x.x/bin/griffin-shell.sh`
+* Run Griffin tool with user defined env file and dq file. eg: `measure-x.x.x/bin/griffin-shell.sh ENV_FILE DQ_FILE`
 
 # ENV_FILE demo
 
@@ -41,12 +42,14 @@ This is helpful for user to debug and run user dq jobs.
 
   "sinks": [
     {
+      "name": "MyConsoleSink",
       "type": "CONSOLE",
       "config": {
         "max.log.lines": 10
       }
     },
     {
+      "name": "MyHDFSSink",
       "type": "HDFS",
       "config": {
         "path": "hdfs://localhost/griffin/batch/persist",
@@ -55,6 +58,7 @@ This is helpful for user to debug and run user dq jobs.
       }
     },
     {
+      "name": "MyElasticSearchSink",
       "type": "ELASTICSEARCH",
       "config": {
         "method": "post",
